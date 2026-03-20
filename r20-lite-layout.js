@@ -42,10 +42,13 @@
         }
 
         iframe {
-          width: 100vw;
-          height: 100vh;
-          border: none;
-          display: block;
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          border: none !important;
+          display: block !important;
         }
     `;
   document.head.appendChild(style);
