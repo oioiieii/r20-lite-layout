@@ -28,34 +28,6 @@
             display: block !important;
         }
 
-        /* Вспомогательные настройки для удобства */
-        /* Фон страницы */
-        body {
-            background-color: #111 !important;
-            background-image: none !important;
-            overflow: hidden !important;
-        }
-
-        /* Сайдбар (чат) — закрепляем его справа */
-        #rightsidebar {
-            position: fixed !important;
-            right: 0 !important;
-            top: 0 !important;
-            height: 100% !important;
-            z-index: 9999 !important;
-            background: #222 !important;
-        }
-
-        /* Листы персонажей (диалоги) */
-        .ui-dialog {
-            z-index: 10000 !important; /* Чтобы они были поверх всего */
-            box-shadow: 0 0 15px rgba(0,0,0,0.5) !important;
-        }
-
-        /* Убираем оверлей, который иногда затемняет экран при открытии окон */
-        .ui-widget-overlay {
-            display: none !important;
-        }
     `;
   // Добавляем стили в head
   document.head.appendChild(style);
