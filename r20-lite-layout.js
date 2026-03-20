@@ -40,6 +40,13 @@
             z-index: 999999;
             touch-action: auto;
         }
+
+        iframe {
+          width: 100vw;
+          height: 100vh;
+          border: none;
+          display: block;
+        }
     `;
   document.head.appendChild(style);
 
