@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Roll20 Minimalist Interface & Iframe Zoom
+// @name         Roll20 Fullscreen Character Sheet with Pinch Zoom
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Скрывает всё, кроме листа и сайдбара, разрешает Pinch-to-zoom внутри iframe
+// @version      1.0
+// @description  Fullscreen iframe для листа персонажа + кастомный pinch-to-zoom на мобильных устройствах
 // @author       You
 // @match        https://app.roll20.net/editor/
 // @grant        none
@@ -12,80 +12,114 @@
 (function () {
   "use strict";
 
-  // *** 1. CSS ИНЪЕКЦИЯ (ОЧИСТКА ИНТЕРФЕЙСА) ***
+  console.log("[R20 Fullscreen Zoom] Script loaded");
 
+  // --- Стили для fullscreen dialog/iframe ---
   const style = document.createElement("style");
-  style.id = "r20-pure-interface";
   style.innerHTML = `
-        /* Скрываем абсолютно все прямые дочерние элементы body */
-        body > * {
-            display: none !important;
+        /* fullscreen dialog */
+        .ui-dialog {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            z-index: 999999 !important;
         }
 
-        /* Принудительно показываем только нужные тебе селекторы */
-        body > div.ui-dialog.ui-widget.ui-widget-content.ui-corner-all.ui-draggable.ui-resizable,
-        body > #rightsidebar {
-            display: block !important;
+        /* iframe внутри dialog */
+        .ui-dialog iframe {
+            width: 100% !important;
+            height: 100% !important;
+            border: none !important;
         }
-
     `;
-  // Добавляем стили в head
   document.head.appendChild(style);
-  console.log("Интерфейс очищен. Оставлены только выбранные элементы.");
 
-  // *** 2. JS ИНЪЕКЦИЯ (НАСТРОЙКА VIEWPORT ВНУТРИ IFRAME) ***
+  // --- Хелпер для pinch-to-zoom ---
+  function enablePinchZoom(iframe) {
+    const doc = iframe.contentDocument;
+    if (!doc) return;
 
-  // Функция для настройки зума внутри фрейма
-  function enableIframeZoom(iframe) {
-    const frameDoc = iframe.contentDocument || iframe.contentWindow.document;
-    if (!frameDoc) return;
+    const body = doc.body;
+    const html = doc.documentElement;
 
-    console.log(
-      "%c [R20 Lite] Настраиваем viewport для iframe...",
-      "color: #00ff00",
+    // touch-action: разрешаем pinch
+    html.style.touchAction = "pan-x pan-y pinch-zoom";
+    body.style.touchAction = "pan-x pan-y pinch-zoom";
+
+    // transform zoom
+    let scale = 1;
+    let initialDistance = null;
+
+    function getDistance(touches) {
+      const [a, b] = touches;
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    }
+
+    function applyZoom() {
+      body.style.transform = `scale(${scale})`;
+      body.style.transformOrigin = "0 0";
+      body.style.width = `${100 / scale}%`;
+      body.style.height = `${100 / scale}%`;
+    }
+
+    doc.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches.length === 2) {
+          initialDistance = getDistance(e.touches);
+        }
+      },
+      { passive: false },
     );
 
-    // 1. Добавляем мета-тег, разрешающий зум
-    let meta = frameDoc.querySelector('meta[name="viewport"]');
-    if (!meta) {
-      meta = frameDoc.createElement("meta");
-      meta.name = "viewport";
-      frameDoc.head.appendChild(meta);
-    }
-    // Устанавливаем параметры, разрешающие масштабирование
-    meta.content =
-      "width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes";
-
-    // 2. Разрешаем touch-события для масштабирования (pinch-to-zoom)
-    // touch-action: pan-x pan-y pinch-zoom надежнее для мобильных браузеров
-    frameDoc.body.style.touchAction = "pan-x pan-y pinch-zoom";
-    frameDoc.documentElement.style.touchAction = "pan-x pan-y pinch-zoom";
+    doc.addEventListener(
+      "touchmove",
+      (e) => {
+        if (e.touches.length === 2 && initialDistance) {
+          e.preventDefault();
+          const newDistance = getDistance(e.touches);
+          const delta = newDistance / initialDistance;
+          scale *= delta;
+          scale = Math.max(0.5, Math.min(scale, 3));
+          applyZoom();
+          initialDistance = newDistance;
+        }
+      },
+      { passive: false },
+    );
   }
 
-  // Следим за появлением новых диалогов
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        // Если добавлен новый узел и это диалоговое окно
-        if (node.nodeType === 1 && node.classList.contains("ui-dialog")) {
-          const iframe = node.querySelector("iframe");
-          if (iframe) {
-            // Ждем загрузки контента во фрейме
-            iframe.onload = () => enableIframeZoom(iframe);
+  // --- MutationObserver для отслеживания появления iframe ---
+  const observer = new MutationObserver(() => {
+    const dialog = document.querySelector("div.ui-dialog");
+    if (!dialog) return;
 
-            // Проверка на случай, если фрейм уже загружен к этому моменту
-            if (
-              iframe.contentDocument &&
-              iframe.contentDocument.readyState === "complete"
-            ) {
-              enableIframeZoom(iframe);
-            }
-          }
-        }
-      });
-    });
+    const iframe = dialog.querySelector("iframe");
+    if (!iframe) return;
+    if (iframe.dataset.fullscreenZoom) return;
+
+    iframe.dataset.fullscreenZoom = "true";
+
+    console.log("[R20 Fullscreen Zoom] Iframe detected, enabling zoom");
+
+    // Отключаем drag jQuery UI
+    if ($(dialog).hasClass("ui-draggable")) {
+      $(dialog).draggable("destroy");
+    }
+
+    // enable pinch zoom после полной загрузки iframe
+    iframe.onload = () => enablePinchZoom(iframe);
+
+    // На случай, если iframe уже загружен
+    if (iframe.contentDocument?.readyState === "complete") {
+      enablePinchZoom(iframe);
+    }
   });
 
-  // Начинаем наблюдение за body
-  observer.observe(document.body, { childList: true });
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
