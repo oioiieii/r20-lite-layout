@@ -195,7 +195,12 @@
     const grid = overlay.querySelector("#custom-char-grid");
     const closeBtn = overlay.querySelector("#custom-char-close");
 
-    const closeAction = () => overlay.remove();
+    const closeAction = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      overlay.remove();
+    };
+
     closeBtn.onclick = closeAction;
 
     cachedCharacters.forEach((data) => {
@@ -258,10 +263,14 @@
     titlebar.appendChild(controls);
 
     controls.querySelector(".auto-open-chk").onchange = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       localStorage.setItem(STORAGE_KEYS.AUTO_OPEN, e.target.checked);
     };
 
     controls.querySelector(".auto-popout-chk").onchange = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       localStorage.setItem(STORAGE_KEYS.AUTO_POPOUT, e.target.checked);
     };
 
